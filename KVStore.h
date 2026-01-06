@@ -10,7 +10,9 @@ private:
     std::unordered_map<std::string, std::string> table;
 
 public:
-    KVStore() = default;
+    KVStore() {
+        load();
+    }
     ~KVStore(){
         flush();
     }
@@ -19,6 +21,7 @@ public:
     std::optional<std::string> get(const std::string& key) const;
     bool remove(const std::string& key);
     void flush();
+    void load();
 };
 
 #endif
