@@ -11,17 +11,24 @@ private:
 
 public:
     KVStore() {
-        load();
+        //load();
+        replay();
     }
     ~KVStore(){
         flush();
     }
-
+    //CRUD
     bool put(const std::string& key, const std::string& value);
     std::optional<std::string> get(const std::string& key) const;
     bool remove(const std::string& key);
+
+    //memory
     void flush();
     void load();
+    
+    //bin-file
+    void append(const std::string &key,const std::string &value);
+    void replay();
 };
 
 #endif

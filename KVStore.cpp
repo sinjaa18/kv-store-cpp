@@ -4,12 +4,15 @@
 #include <sstream>
 #include<string>    
 
-bool KVStore::put(const std::string& key, const std::string& val) {
+//putting data
+bool KVStore::put(const std::string& key, const std::string& value) {
     if (key.empty()) return false;
-    table[key] = val;
+    append(key,value);
+    table[key] = value;
     return true;
 }
 
+//retrieving data
 std::optional<std::string> KVStore::get(const std::string& key) const {
     auto it = table.find(key);
     if (it == table.end()) {
@@ -18,10 +21,14 @@ std::optional<std::string> KVStore::get(const std::string& key) const {
     return it->second;
 }
 
+//deleting data
 bool KVStore::remove(const std::string& key) {
     return table.erase(key) > 0;
 }
 
+//CSV FILE
+
+//on start loads all data
 void KVStore::load(){
     std::ifstream inFile("data.csv");
     if (!inFile.is_open()) {
@@ -39,11 +46,56 @@ void KVStore::load(){
     inFile.close();
 }
 
+//on exit save all data
 void KVStore:: flush(){
-    std::ofstream fileout("data.csv",std::ios::app);
+    std::ofstream fileout("data.csv",std::ios::trunc);
     for(auto it:table){
         fileout<<it.first<<","<<it.second<<"\n";
     }
     fileout.close();
 }
 
+//BINARY FILE
+
+//binary-append
+void KVStore:: append(const std::string &key,const std::string &value){
+    std::ofstream outFile("data.bin",std::ios::binary|std::ios::app);
+    int k = key.size();
+    int v = value.size();
+    outFile.write((char*)&k,sizeof(int));
+    outFile.write((char*)&v,sizeof(int));
+    outFile.write(key.c_str(),k);
+    outFile.write(value.c_str(),v);
+    outFile.close();
+
+}
+
+//binary-replay
+void KVStore::replay() {
+    std::ifstream inFile("data.bin", std::ios::binary);
+    if (!inFile.is_open()) {
+        return;
+    }
+
+    while (true) {
+        int k, v;
+        if (!inFile.read(reinterpret_cast<char*>(&k), sizeof(k)))
+            break;
+
+        if (!inFile.read(reinterpret_cast<char*>(&v), sizeof(v)))
+            break;
+
+        std::string key(k, '\0');
+        std::string value(v, '\0');
+
+        if (!inFile.read(&key[0], k))
+            break;
+
+        if (!inFile.read(&value[0], v))
+            break;
+
+        table[key] = value;
+    }
+
+    inFile.close();
+}
