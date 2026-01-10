@@ -15,7 +15,7 @@ public:
         replay();
     }
     ~KVStore(){
-        flush();
+       // flush();
     }
     //CRUD
     bool put(const std::string& key, const std::string& value);
@@ -27,7 +27,8 @@ public:
     void load();
     
     //bin-file
-    void append(const std::string &key,const std::string &value);
+    void append_put(const std::string &key,const std::string &value);
+    void append_remove(const std::string &key);
     void replay();
 };
 

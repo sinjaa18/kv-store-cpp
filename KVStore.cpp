@@ -7,7 +7,7 @@
 //putting data
 bool KVStore::put(const std::string& key, const std::string& value) {
     if (key.empty()) return false;
-    append(key,value);
+    append_put(key,value);
     table[key] = value;
     return true;
 }
@@ -23,6 +23,7 @@ std::optional<std::string> KVStore::get(const std::string& key) const {
 
 //deleting data
 bool KVStore::remove(const std::string& key) {
+    append_remove(key);
     return table.erase(key) > 0;
 }
 
@@ -58,7 +59,7 @@ void KVStore:: flush(){
 //BINARY FILE
 
 //binary-append
-void KVStore:: append(const std::string &key,const std::string &value){
+void KVStore:: append_put(const std::string &key,const std::string &value){
     std::ofstream outFile("data.bin",std::ios::binary|std::ios::app);
     int k = key.size();
     int v = value.size();
@@ -66,6 +67,17 @@ void KVStore:: append(const std::string &key,const std::string &value){
     outFile.write((char*)&v,sizeof(int));
     outFile.write(key.c_str(),k);
     outFile.write(value.c_str(),v);
+    outFile.close();
+
+}
+//binary-tombstone
+void KVStore:: append_remove(const std::string &key){
+    std::ofstream outFile("data.bin",std::ios::binary|std::ios::app);
+    int k = key.size();
+    int v = -1;
+    outFile.write((char*)&k,sizeof(int));
+    outFile.write((char*)&v,sizeof(int));
+    outFile.write(key.c_str(),k);
     outFile.close();
 
 }
@@ -86,15 +98,18 @@ void KVStore::replay() {
             break;
 
         std::string key(k, '\0');
-        std::string value(v, '\0');
 
         if (!inFile.read(&key[0], k))
             break;
 
-        if (!inFile.read(&value[0], v))
+        if(v==-1){
+           if(table.find(key)!=table.end()) table.erase(key);
+           continue;
+        }
+            std::string value(v, '\0');
+            if(!inFile.read(&value[0], v))
             break;
-
-        table[key] = value;
+            table[key] = value;
     }
 
     inFile.close();
