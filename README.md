@@ -1,114 +1,262 @@
-# Log-Structured Key-Value Store (C++)
+# ⚡ LogStoreDB
 
-A crash-safe, append-only, log-structured key-value store built from scratch in C++.
+![C++](https://img.shields.io/badge/C++-17-blue)
+![Platform](https://img.shields.io/badge/platform-linux-lightgrey)
+![Storage Engine](https://img.shields.io/badge/type-storage_engine-orange)
+![WAL](https://img.shields.io/badge/design-write_ahead_log-green)
+![License](https://img.shields.io/badge/license-MIT-yellow)
 
-This project implements a simplified storage engine inspired by real-world database systems using write-ahead logging, deterministic replay, and tombstone-based deletes.
+A crash-safe append-only key-value storage engine built in modern C++.
+
+LogStoreDB implements core database internals including:
+
+- Write-Ahead Logging (WAL)
+- Deterministic crash recovery
+- Tombstone-based deletes
+- Log-structured storage
+- Thread-safe operations
+
+Inspired by storage systems like LevelDB, RocksDB, Bitcask, and Redis AOF.
 
 ---
 
-## 🚀 Features
+# 📑 Table of Contents
 
-* In-memory storage using `std::unordered_map`
-* Append-only binary Write-Ahead Log (WAL)
-* Crash recovery via deterministic replay
-* Tombstone-based logical deletes
-* Last-write-wins semantics
-* Thread-safe operations using `std::mutex`
-* Interactive CLI (PUT / GET / REMOVE / EXIT)
+- [Features](#-features)
+- [Architecture Overview](#-architecture-overview)
+- [Write Path](#-write-path-put)
+- [Delete Path](#-delete-path-remove)
+- [Crash Recovery](#-crash-recovery)
+- [Binary Log Format](#-binary-log-format)
+- [Thread Safety](#-thread-safety)
+- [Project Structure](#-project-structure)
+- [Screenshots](#-screenshots)
+- [Build & Run](#-build--run)
+- [Design Decisions](#-design-decisions)
+- [Crash Safety](#-crash-safety)
+- [Limitations](#-limitations)
+- [Future Improvements](#-future-improvements)
+- [Learning Outcomes](#-learning-outcomes)
+- [Inspiration](#-inspiration)
+- [License](#-license)
 
 ---
 
-## 🧠 Architecture Overview
+# 🚀 Features
 
-### Write Path (PUT)
+## 💾 Persistent Storage
 
+- Append-only binary Write-Ahead Log (WAL)
+- Durable disk-first writes
+- Crash-safe recovery using deterministic replay
+
+## ⚡ Key-Value Operations
+
+- PUT / GET / REMOVE support
+- Last-write-wins semantics
+- Tombstone-based logical deletes
+
+## 🧵 Concurrency
+
+- Thread-safe operations using `std::mutex`
+- Atomic log + memory updates
+- Safe concurrent access
+
+## 🖥️ Interactive CLI
+
+- Simple command-line interface
+- Real-time operations
+- Persistent state across restarts
+
+---
+
+# 🧠 Architecture Overview
+
+LogStoreDB follows a log-structured architecture.
+
+Every modification is first appended to disk before updating memory.
+
+```text
+Client Request
+      │
+      ▼
++----------------+
+|    KVStore     |
++----------------+
+   │         │
+   ▼         ▼
+Memory      WAL File
+(HashMap)   data.bin
 ```
-PUT key value →
-  1. Append binary record to data.bin
-  2. Update in-memory map
+
+The WAL (`data.bin`) acts as the single source of truth.
+
+---
+
+# ✍️ Write Path (PUT)
+
+```text
+PUT key value
+      │
+      ▼
+1. Append binary record to WAL
+2. Flush write to disk
+3. Update in-memory hashmap
 ```
 
 Durability is guaranteed because disk is written before memory is updated.
 
 ---
 
-### Delete Path (REMOVE)
+# ❌ Delete Path (REMOVE)
 
-```
-REMOVE key →
-  1. Append tombstone record (value_size = -1)
-  2. Erase key from memory
+Deletes are implemented using tombstone records.
+
+```text
+REMOVE key
+      │
+      ▼
+1. Append tombstone record
+2. Remove key from memory
 ```
 
-Deletes are logical. Old records remain in the log but are ignored during replay.
+A tombstone is represented by:
+
+```text
+value_size = -1
+```
+
+Old records remain in the log and are ignored during replay.
 
 ---
 
-### Recovery on Startup
+# 🔄 Crash Recovery
 
-On initialization:
+On startup, the entire WAL is replayed sequentially.
 
-```
-Replay entire binary log →
-Reconstruct latest state →
+```text
+Replay WAL
+     │
+     ▼
+Reconstruct latest state
+     │
+     ▼
 Last write wins
 ```
 
-Partial or corrupted tail records are safely ignored.
+The recovery system safely ignores:
+
+- Partial records
+- Corrupted tail writes
+- Incomplete shutdowns
 
 ---
 
-## 📦 Binary Log Format
+# 📦 Binary Log Format
 
-Each record is stored as:
+Each WAL entry is stored in binary format:
 
+```text
+[int key_size]
+[int value_size]
+[key bytes]
+[value bytes]
 ```
-[int key_size][int value_size][key bytes][value bytes]
-```
 
-### Tombstone Record
+## Tombstone Record
 
-```
+```text
 value_size == -1
 ```
 
 This indicates a DELETE operation.
 
-Storing sizes before data ensures precise parsing in a raw binary stream.
+Using explicit sizes before data enables precise parsing in raw binary streams.
 
 ---
 
-## 🔒 Thread Safety
+# 🔒 Thread Safety
 
-All operations (`PUT`, `GET`, `REMOVE`, and `replay`) are protected by a single `std::mutex`.
+All operations are protected using a single global `std::mutex`.
+
+Protected operations include:
+
+- PUT
+- GET
+- REMOVE
+- WAL replay
 
 This guarantees:
 
-* No race conditions on `unordered_map`
-* No interleaving of log writes
-* Atomic disk + memory updates
+- No race conditions
+- No interleaved log writes
+- Atomic memory + disk consistency
 
-The design prioritizes correctness over parallel performance.
+The design prioritizes correctness and simplicity over parallel throughput.
 
 ---
 
-## 🛠 Build & Run
+# 📂 Project Structure
 
-Compile:
-
-```bash
-g++ main.cpp KVStore.cpp -std=c++17 -o kvstore
+```text
+LogStoreDB/
+│
+├── src/
+│   ├── KVStore.cpp
+│   ├── KVStore.h
+│   └── main.cpp
+│
+├── data/
+│   └── data.bin
+│
+├── screenshots/
+│   ├── cli-demo.png
+│   ├── recovery-demo.png
+│   └── wal-hexdump.png
+│
+├── README.md
+└── LICENSE
 ```
 
-Run:
+---
+
+# 📸 Screenshots
+
+## CLI Demo
+
+![CLI Demo](screenshots/cli-demo.png)
+
+---
+
+## Crash Recovery Demo
+
+![alt text](screenshots/crash-recovery.png)
+---
+
+## WAL Binary Dump
+
+![alt text](screenshots/WAL-binDump.png)
+---
+
+# 🛠️ Build & Run
+
+## Compile
+
+```bash
+g++ src/main.cpp src/KVStore.cpp -std=c++17 -o kvstore
+```
+
+## Run
 
 ```bash
 ./kvstore
 ```
 
-Supported commands:
+---
 
-```
+# 💻 Supported Commands
+
+```text
 PUT key value
 GET key
 REMOVE key
@@ -117,56 +265,105 @@ EXIT
 
 ---
 
-## 🧪 Crash Safety
+# 🧠 Design Decisions
 
-The system is resilient to:
+## Why Append-Only Logging?
 
-* Forced termination during writes
-* Partial log records
-* Restart after unexpected shutdown
+Appending avoids expensive random disk writes and simplifies crash recovery.
 
-The log is the single source of truth.
+## Why Tombstones Instead of Physical Deletes?
 
----
+Physical deletion inside binary files is unsafe and inefficient.
+Tombstones preserve operation history while enabling deterministic replay.
 
-## ⚠ Limitations
+## Why Replay-Based Recovery?
 
-* No log compaction (file grows indefinitely)
-* Single global mutex (no fine-grained locking)
-* No networking interface
-* No disk-based indexing
-* No unit test suite
+The WAL acts as the single source of truth.
+State reconstruction guarantees consistency after crashes.
 
-This project focuses on core storage engine concepts.
+## Why Single Mutex?
+
+The project prioritizes correctness and predictable behavior before introducing fine-grained concurrency.
 
 ---
 
-## 🎯 Learning Outcomes
+# 🧪 Crash Safety
+
+The storage engine is resilient to:
+
+- Forced termination during writes
+- Partial WAL records
+- Unexpected shutdowns
+- Corrupted log tails
+
+Recovery is deterministic because the WAL is replayed sequentially.
+
+---
+
+# ⚠️ Limitations
+
+- No log compaction
+- File size grows indefinitely
+- Single global mutex
+- No networking layer
+- No disk-based indexing
+- No unit test suite
+- No replication or snapshots
+
+This project focuses primarily on storage engine fundamentals.
+
+---
+
+# 🚀 Future Improvements
+
+- [ ] Log compaction
+- [ ] Offset-based indexing
+- [ ] Read-write locks
+- [ ] Multi-threaded replay
+- [ ] Networking layer
+- [ ] Benchmark suite
+- [ ] Unit & integration tests
+- [ ] Disk-backed SSTables
+- [ ] LSM-tree style compaction
+
+---
+
+# 📚 Learning Outcomes
 
 This project demonstrates understanding of:
 
-* Binary serialization
-* Write-Ahead Logging (WAL)
-* Log-structured storage design
-* Tombstone-based deletes
-* Crash recovery via replay
-* Concurrency control using mutex
-* Separation of storage logic and interface
+- Binary serialization
+- Write-Ahead Logging (WAL)
+- Log-structured storage engines
+- Crash recovery systems
+- Tombstone-based deletes
+- Concurrency control using mutexes
+- Deterministic replay
+- Persistent storage internals
+- Separation of storage and interface layers
 
 ---
 
-## 📌 Future Improvements (Optional)
+# 📖 Inspiration
 
-* Log compaction
-* Offset-based index for disk reads
-* Read-write locks for better concurrency
-* Networking layer
-* Benchmarks and stress tests
+Inspired by concepts used in modern storage engines and databases:
+
+- LevelDB
+- RocksDB
+- Bitcask
+- Redis AOF
+- LSM-tree architectures
+
+---
+
+# 📄 License
+
+MIT License
+
+This project was built for educational and learning purposes.
 
 ---
 
-## 📄 License
+# ⭐ Support
 
-Educational / personal project.
-
----
+If you found this project useful, consider giving the repository a star.
