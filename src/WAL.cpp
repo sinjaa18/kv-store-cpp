@@ -1,8 +1,19 @@
 #include "WAL.h"
 #include<fstream>
 
-WAL::WAL(std::string file):filename(file){}
+WAL::WAL(std::string file)
+:filename(file){}
 
+uint32_t WAL::checksum(
+const std::string& key,
+const std::string& value){
+    uint32_t hash=0;
+    for(char c:key)
+        hash=hash*31+c;
+    for(char c:value)
+        hash=hash*31+c;
+    return hash;
+}
 
 void WAL::appendPut(
 const std::string& key,
@@ -13,41 +24,50 @@ const std::string& value){
         std::ios::app
     );
 
-    int k=key.size();
-    int v=value.size();
 
-    out.write((char*)&k,sizeof(k));
-    out.write((char*)&v,sizeof(v));
-
-    out.write(
-        key.data(),
-        k
-    );
+    WALRecord rec;
+    rec.sequence=++currentSequence;
+    rec.op=PUT;
+    rec.keySize=key.size();
+    rec.valueSize=value.size();
+    rec.checksum=
+    checksum(key,value);
 
     out.write(
-        value.data(),
-        v
-    );
+    (char*)&rec,
+    sizeof(rec));
+
+    out.write(
+    key.data(),
+    key.size());
+
+    out.write(
+    value.data(),
+    value.size());
 }
-
 
 void WAL::appendDelete(
 const std::string& key){
-
     std::ofstream out(
         filename,
         std::ios::binary|
         std::ios::app
     );
 
-    int k=key.size();
-    int v=-1;
+    WALRecord rec;
 
-    out.write((char*)&k,sizeof(k));
-    out.write((char*)&v,sizeof(v));
+    rec.sequence=++currentSequence;
+    rec.op=DELETE;
+    rec.keySize=key.size();
+    rec.valueSize=0;
+    rec.checksum=
+    checksum(key,"");
 
     out.write(
-        key.data(),
-        k
-    );
+    (char*)&rec,
+    sizeof(rec));
+
+    out.write(
+    key.data(),
+    key.size());
 }
