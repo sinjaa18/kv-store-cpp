@@ -11,17 +11,25 @@ class WAL{
     uint32_t checksum(
         const std::string& key,
         const std::string& value
-    );
+    )const;
+
+    void writeUint64(std::ofstream& out, uint64_t value);
+    void writeUint32(std::ofstream& out, uint32_t value);
+    void writeUint8(std::ofstream& out, uint8_t value);
 public:
     WAL(std::string file);
-    void appendPut(
+    bool appendPut(
         const std::string& key,
         const std::string& value
     );
 
-    void appendDelete(
+    bool appendDelete(
         const std::string& key
     );
+
+    bool verifyChecksum(uint32_t expected,const std:: string&key, const std::string &value)const;
+
+    void setCurrentSequence(uint64_t sequence);
 };
 
 
