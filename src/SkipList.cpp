@@ -1,8 +1,10 @@
 #include "SkipList.h"
 #include <cstdlib>
 #include <vector>
+#include <ctime>
 
 SkipList::SkipList() :currentLevel(1) {
+    srand(static_cast<unsigned int>(time(0)));
     head = new Node("", "", MAX_LEVEL);
 }
 
@@ -87,6 +89,17 @@ int SkipList::randomLevel() {
     while (level < MAX_LEVEL && rand() % 2)
         level++;
     return level;
+}
+
+std::vector<std::pair<std::string,std:: string>> SkipList::entries()const{
+    std::vector < std::pair < std::string, std::string>>result;
+    Node* cur=head->next[0];
+
+    while(cur){
+        result.push_back({cur->key,cur->value});
+        cur=cur->next[0];
+    }
+    return result;
 }
 
 SkipList::~SkipList() {

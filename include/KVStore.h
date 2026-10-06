@@ -25,6 +25,7 @@ public:
         const std::string& key
     );
     void replay();
+    
 };
 
 #endif

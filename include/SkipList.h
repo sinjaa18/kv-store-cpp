@@ -2,6 +2,7 @@
 #define SKIPLIST_H
 
 #include<vector>
+#include<utility>
 #include<string>
 #include<optional>
 
@@ -23,9 +24,9 @@ public:
     bool put(const std::string& key,const std::string& value);
     std::optional<std::string> get(const std::string& key)const;
     bool remove(const std::string& key);
+    std::vector<std::pair<std::string,std::string>> entries()const;
 private:
     int randomLevel();
-
 };
 
 #endif

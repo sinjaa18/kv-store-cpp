@@ -2,15 +2,16 @@
 #define MEMTABLE_H
 
 #include<string>
-#include<unordered_map>
+#include "SkipList.h"
 #include<optional>
 
 class MemTable {
-    std::unordered_map<std::string, std::string> data;
+    SkipList data;
 public:
-    bool put(const std::string& key,const std::string& value);
-    std::optional<std::string> get(const std::string& key)const;
+    bool put(const std::string& key, const std::string& value);
+    std::optional<std::string> get(const std::string& key) const;
     bool remove(const std::string& key);
+    std::vector<std::pair<std::string, std::string>> entries() const;
 };
 
 #endif
