@@ -9,6 +9,8 @@ add_library(KVS_core
     src/WAL.cpp
     src/MemTable.cpp
     src/SkipList.cpp
+    src/SSTableWriter.cpp
+    src/SSTableReader.cpp
 )
 target_include_directories(KVS_core PUBLIC include)
 
@@ -38,8 +40,12 @@ target_link_libraries(test_wal PRIVATE KVS_core gtest_main)
 add_executable(test_kvstore tests/test_kvstore.cpp)
 target_link_libraries(test_kvstore PRIVATE KVS_core gtest_main)
 
+add_executable(test_sstable tests/test_sstable.cpp)
+target_link_libraries(test_sstable PRIVATE KVS_core gtest_main)
+
 include(GoogleTest)
 gtest_discover_tests(test_skiplist)
 gtest_discover_tests(test_memtable)
 gtest_discover_tests(test_wal)
 gtest_discover_tests(test_kvstore)
+gtest_discover_tests(test_sstable)
