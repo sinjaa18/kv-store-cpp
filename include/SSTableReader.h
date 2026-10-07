@@ -8,10 +8,17 @@
 #include <utility>
 #include <cstdint>
 
+#include "Block.h"
+
 class SSTableReader {
     std::string filename;
     std::ifstream in;
-    uint32_t entryCount = 0;
+    
+    struct BlockHandle {
+        uint64_t offset;
+        uint64_t size;
+    };
+    std::vector<BlockHandle> blocks;
 public:
     SSTableReader(const std::string& file);
     ~SSTableReader();
@@ -21,6 +28,8 @@ public:
     
     std::vector<std::pair<std::string, std::string>> readAll();
     void close();
+private:
+    BlockReader readBlock(uint64_t offset, uint64_t size);
 };
 
 #endif

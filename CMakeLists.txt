@@ -11,6 +11,7 @@ add_library(KVS_core
     src/SkipList.cpp
     src/SSTableWriter.cpp
     src/SSTableReader.cpp
+    src/Block.cpp
 )
 target_include_directories(KVS_core PUBLIC include)
 
