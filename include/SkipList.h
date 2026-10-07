@@ -18,6 +18,7 @@ class SkipList {
     static constexpr int MAX_LEVEL = 16;
     int currentLevel;
     Node* head;
+    size_t numEntries = 0;
 public:
     SkipList();
     ~SkipList();
@@ -25,6 +26,8 @@ public:
     std::optional<std::string> get(const std::string& key)const;
     bool remove(const std::string& key);
     std::vector<std::pair<std::string,std::string>> entries()const;
+    size_t size() const;
+    void clear();
 private:
     int randomLevel();
 };

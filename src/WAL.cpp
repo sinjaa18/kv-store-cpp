@@ -116,3 +116,9 @@ bool WAL::appendDelete(
 void WAL::setCurrentSequence(uint64_t sequence) {
     currentSequence = sequence;
 }
+
+void WAL::clear() {
+    std::ofstream out(filename, std::ios::trunc | std::ios::binary);
+    out.close();
+    currentSequence = 0;
+}

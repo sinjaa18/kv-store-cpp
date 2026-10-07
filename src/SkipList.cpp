@@ -39,6 +39,7 @@ bool SkipList::put(const std::string& key, const std::string& value) {
         node->next[i] = update[i]->next[i];
         update[i]->next[i] = node;
     }
+    numEntries++;
 
     return true;
 }
@@ -81,6 +82,7 @@ bool SkipList::remove(const std::string& key) {
     while (currentLevel > 1 &&
         head->next[currentLevel - 1] == nullptr)
         currentLevel--;
+    numEntries--;
     return true;
 }
 
@@ -109,4 +111,22 @@ SkipList::~SkipList() {
         delete cur;
         cur = nxt;
     }
+}
+
+size_t SkipList::size() const {
+    return numEntries;
+}
+
+void SkipList::clear() {
+    Node* cur = head->next[0];
+    while (cur) {
+        Node* nxt = cur->next[0];
+        delete cur;
+        cur = nxt;
+    }
+    for (int i = 0; i < MAX_LEVEL; ++i) {
+        head->next[i] = nullptr;
+    }
+    currentLevel = 1;
+    numEntries = 0;
 }

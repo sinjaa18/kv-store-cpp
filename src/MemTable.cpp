@@ -21,3 +21,11 @@ bool MemTable::remove(
 std::vector<std::pair<std::string, std::string>> MemTable::entries() const {
     return data.entries();
 }
+
+size_t MemTable::size() const {
+    return data.size();
+}
+
+void MemTable::clear() {
+    data.clear();
+}

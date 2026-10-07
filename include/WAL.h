@@ -30,6 +30,7 @@ public:
     bool verifyChecksum(uint32_t expected,const std:: string&key, const std::string &value)const;
 
     void setCurrentSequence(uint64_t sequence);
+    void clear();
 };
 
 

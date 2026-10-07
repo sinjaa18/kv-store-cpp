@@ -24,6 +24,8 @@ public:
     SSTableReader(const std::string& file);
     ~SSTableReader();
 
+    std::string getFilename() const { return filename; }
+
     bool open();
     std::optional<std::string> get(const std::string& key);
     
