@@ -15,11 +15,13 @@ class SSTableWriter {
     BlockBuilder currentBlock;
     
     struct BlockHandle {
+        std::string firstKey;
         uint64_t offset;
         uint64_t size;
     };
     std::vector<BlockHandle> blocks;
     uint64_t currentOffset = 0;
+    std::string currentFirstKey;
     
     static constexpr size_t BLOCK_SIZE_LIMIT = 4096;
 

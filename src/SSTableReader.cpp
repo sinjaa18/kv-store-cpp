@@ -24,14 +24,19 @@ bool SSTableReader::open() {
     if (indexOffset > static_cast<uint64_t>(fileSize - 16)) return false;
     
     uint64_t indexSize = (fileSize - 16) - indexOffset;
-    if (indexSize % sizeof(BlockHandle) != 0) return false;
-    
-    uint64_t numBlocks = indexSize / sizeof(BlockHandle);
-    blocks.resize(numBlocks);
-    
-    if (numBlocks > 0) {
-        in.seekg(indexOffset);
-        in.read(reinterpret_cast<char*>(blocks.data()), indexSize);
+    if (indexSize > 0) {
+        BlockReader indexReader = readBlock(indexOffset, indexSize);
+        auto indexEntries = indexReader.readAll();
+        
+        for (const auto& entry : indexEntries) {
+            BlockHandle bh;
+            bh.firstKey = entry.first;
+            if (entry.second.size() == sizeof(uint64_t) * 2) {
+                std::memcpy(&bh.offset, entry.second.data(), sizeof(uint64_t));
+                std::memcpy(&bh.size, entry.second.data() + sizeof(uint64_t), sizeof(uint64_t));
+                blocks.push_back(bh);
+            }
+        }
     }
     
     return true;
@@ -45,15 +50,25 @@ BlockReader SSTableReader::readBlock(uint64_t offset, uint64_t size) {
 }
 
 std::optional<std::string> SSTableReader::get(const std::string& targetKey) {
-    if (!in.is_open()) return std::nullopt;
+    if (!in.is_open() || blocks.empty()) return std::nullopt;
     
-    for (const auto& bh : blocks) {
-        BlockReader reader = readBlock(bh.offset, bh.size);
-        auto entries = reader.readAll();
-        for (const auto& entry : entries) {
-            if (entry.first == targetKey) {
-                return entry.second;
-            }
+    int candidateIndex = -1;
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        if (blocks[i].firstKey <= targetKey) {
+            candidateIndex = i;
+        } else {
+            break;
+        }
+    }
+    
+    if (candidateIndex == -1) return std::nullopt;
+    
+    BlockReader reader = readBlock(blocks[candidateIndex].offset, blocks[candidateIndex].size);
+    auto entries = reader.readAll();
+    
+    for (const auto& entry : entries) {
+        if (entry.first == targetKey) {
+            return entry.second;
         }
     }
     

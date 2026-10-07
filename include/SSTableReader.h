@@ -15,6 +15,7 @@ class SSTableReader {
     std::ifstream in;
     
     struct BlockHandle {
+        std::string firstKey;
         uint64_t offset;
         uint64_t size;
     };
