@@ -1,22 +1,23 @@
-# ⚡ LogStoreDB
+# ⚡ LogStoreDB (LSM Storage Engine)
 
 ![C++](https://img.shields.io/badge/C++-17-blue)
-![Platform](https://img.shields.io/badge/platform-linux-lightgrey)
+![Platform](https://img.shields.io/badge/platform-linux%2Fwindows-lightgrey)
 ![Storage Engine](https://img.shields.io/badge/type-storage_engine-orange)
-![WAL](https://img.shields.io/badge/design-write_ahead_log-green)
+![LSM Tree](https://img.shields.io/badge/design-lsm_tree-green)
 ![License](https://img.shields.io/badge/license-MIT-yellow)
 
-A crash-safe append-only key-value storage engine built in modern C++.
+A crash-safe, Log-Structured Merge (LSM) Tree key-value storage engine built in modern C++. 
 
 LogStoreDB implements core database internals including:
-
 - Write-Ahead Logging (WAL)
+- In-memory MemTable (powered by a custom SkipList)
+- Immutable on-disk SSTables (Sorted String Tables) with Block Storage
+- Block Indexing for efficient O(1) block lookups
+- Background/Synchronous Compaction (L0 to L1)
 - Deterministic crash recovery
 - Tombstone-based deletes
-- Log-structured storage
-- Thread-safe operations
 
-Inspired by storage systems like LevelDB, RocksDB, Bitcask, and Redis AOF.
+Inspired by production storage systems like **LevelDB, RocksDB, Pebble, and Badger**.
 
 ---
 
@@ -25,56 +26,37 @@ Inspired by storage systems like LevelDB, RocksDB, Bitcask, and Redis AOF.
 - [Features](#-features)
 - [Architecture Overview](#-architecture-overview)
 - [Write Path](#-write-path-put)
-- [Delete Path](#-delete-path-remove)
-- [Crash Recovery](#-crash-recovery)
-- [Binary Log Format](#-binary-log-format)
-- [Thread Safety](#-thread-safety)
+- [Read Path](#-read-path-get)
+- [Compaction](#-compaction)
 - [Project Structure](#-project-structure)
-- [Screenshots](#-screenshots)
-- [Build & Run](#-build--run)
-- [Design Decisions](#-design-decisions)
-- [Crash Safety](#-crash-safety)
-- [Limitations](#-limitations)
-- [Future Improvements](#-future-improvements)
+- [Build & Test](#-build--test)
 - [Learning Outcomes](#-learning-outcomes)
-- [Inspiration](#-inspiration)
 - [License](#-license)
 
 ---
 
 # 🚀 Features
 
-## 💾 Persistent Storage
-
-- Append-only binary Write-Ahead Log (WAL)
-- Durable disk-first writes
-- Crash-safe recovery using deterministic replay
+## 💾 Persistent LSM Storage
+- **MemTable**: In-memory sorted structure (SkipList) for fast writes and reads.
+- **SSTables**: Immutable disk files containing sorted data chunked into 4KB Data Blocks.
+- **Index Blocks**: Each SSTable has an embedded index block (mapping `firstKey` to block offsets) to avoid full-file scans during `GET`.
+- **Write-Ahead Log (WAL)**: Ensures crash-safe recovery for data in the MemTable.
 
 ## ⚡ Key-Value Operations
+- PUT / GET / REMOVE support.
+- Last-write-wins semantics.
+- Tombstone-based logical deletes that correctly mask older values in disk levels.
 
-- PUT / GET / REMOVE support
-- Last-write-wins semantics
-- Tombstone-based logical deletes
-
-## 🧵 Concurrency
-
-- Thread-safe operations using `std::mutex`
-- Atomic log + memory updates
-- Safe concurrent access
-
-## 🖥️ Interactive CLI
-
-- Simple command-line interface
-- Real-time operations
-- Persistent state across restarts
+## 🔄 Compaction
+- Automatic merging of smaller SSTables into larger compacted tables.
+- Purges tombstones and reclaims space.
 
 ---
 
 # 🧠 Architecture Overview
 
-LogStoreDB follows a log-structured architecture.
-
-Every modification is first appended to disk before updating memory.
+LogStoreDB follows a classic LSM-Tree architecture:
 
 ```text
 Client Request
@@ -83,13 +65,23 @@ Client Request
 +----------------+
 |    KVStore     |
 +----------------+
-   │         │
-   ▼         ▼
-Memory      WAL File
-(HashMap)   data.bin
+    │        │
+    ▼        ▼
+  WAL    MemTable (SkipList)
+    │        │
+    │        ▼
+    │   +---------+
+    │   | SSTable | (Level 0)
+    │   +---------+
+    │        │
+    │        ▼
+    │   Compaction
+    │        │
+    │        ▼
+    │   +---------+
+    │   | SSTable | (Level 1)
+    │   +---------+
 ```
-
-The WAL (`data.bin`) acts as the single source of truth.
 
 ---
 
@@ -99,100 +91,51 @@ The WAL (`data.bin`) acts as the single source of truth.
 PUT key value
       │
       ▼
-1. Append binary record to WAL
-2. Flush write to disk
-3. Update in-memory hashmap
+1. Append binary record to WAL (disk)
+2. Update MemTable (memory)
+3. If MemTable > Limit:
+   a. Flush to immutable SSTable (disk)
+   b. Clear WAL and MemTable
+4. If SSTable count >= 4:
+   a. Trigger L0 -> L1 Compaction
 ```
 
-Durability is guaranteed because disk is written before memory is updated.
-
----
-
-# ❌ Delete Path (REMOVE)
-
-Deletes are implemented using tombstone records.
+# 🔍 Read Path (GET)
 
 ```text
-REMOVE key
+GET key
       │
       ▼
-1. Append tombstone record
-2. Remove key from memory
+1. Check MemTable. If found, return.
+2. Check SSTables (newest to oldest):
+   a. Load Index Block
+   b. Find target Data Block using firstKey index
+   c. Read Data Block and search for key
+3. If Tombstone found, return NOT FOUND.
 ```
-
-A tombstone is represented by:
-
-```text
-value_size = -1
-```
-
-Old records remain in the log and are ignored during replay.
 
 ---
 
-# 🔄 Crash Recovery
+# 🛠️ Build & Test
 
-On startup, the entire WAL is replayed sequentially.
+LogStoreDB uses CMake and GoogleTest.
 
-```text
-Replay WAL
-     │
-     ▼
-Reconstruct latest state
-     │
-     ▼
-Last write wins
+## Build
+
+```bash
+mkdir build
+cd build
+cmake ..
+cmake --build .
 ```
 
-The recovery system safely ignores:
+## Run Tests
 
-- Partial records
-- Corrupted tail writes
-- Incomplete shutdowns
+The test suite covers SkipList levels, MemTable iteration, WAL recovery, SSTable Blocks/Indexing, and full KVStore Compaction.
 
----
-
-# 📦 Binary Log Format
-
-Each WAL entry is stored in binary format:
-
-```text
-[int key_size]
-[int value_size]
-[key bytes]
-[value bytes]
+```bash
+ctest --output-on-failure
 ```
-
-## Tombstone Record
-
-```text
-value_size == -1
-```
-
-This indicates a DELETE operation.
-
-Using explicit sizes before data enables precise parsing in raw binary streams.
-
----
-
-# 🔒 Thread Safety
-
-All operations are protected using a single global `std::mutex`.
-
-Protected operations include:
-
-- PUT
-- GET
-- REMOVE
-- WAL replay
-
-This guarantees:
-
-- No race conditions
-- No interleaved log writes
-- Atomic memory + disk consistency
-
-The design prioritizes correctness and simplicity over parallel throughput.
 
 ---
 
@@ -201,169 +144,39 @@ The design prioritizes correctness and simplicity over parallel throughput.
 ```text
 LogStoreDB/
 │
-├── src/
-│   ├── KVStore.cpp
-│   ├── KVStore.h
-│   └── main.cpp
+├── include/
+│   ├── Block.h         # SSTable block builder/reader
+│   ├── KVStore.h       # Main LSM engine orchestrator
+│   ├── MemTable.h      # SkipList-backed MemTable
+│   ├── SkipList.h      # Custom probabilistic SkipList
+│   ├── SSTableReader.h # On-disk Index & Data block reader
+│   ├── SSTableWriter.h # On-disk block flusher
+│   └── WAL.h           # Write-Ahead Log
 │
-├── data/
-│   └── data.bin
+├── src/                # Implementation files
+├── tests/              # GoogleTest test suites
+│   ├── test_kvstore.cpp
+│   ├── test_memtable.cpp
+│   ├── test_skiplist.cpp
+│   ├── test_sstable.cpp
+│   └── test_wal.cpp
 │
-├── screenshots/
-│   ├── cli-demo.png
-│   ├── recovery-demo.png
-│   └── wal-hexdump.png
-│
-├── README.md
-└── LICENSE
+└── CMakeLists.txt
 ```
-
----
-
-# 📸 Screenshots
-
-## CLI Demo
-
-![CLI Demo](screenshots/cli-demo.png)
-
----
-
-## Crash Recovery Demo
-
-![alt text](screenshots/crash-recovery.png)
----
-
-## WAL Binary Dump
-
-![alt text](screenshots/WAL-binDump.png)
----
-
-# 🛠️ Build & Run
-
-## Compile
-
-```bash
-g++ src/main.cpp src/KVStore.cpp -std=c++17 -o kvstore
-```
-
-## Run
-
-```bash
-./kvstore
-```
-
----
-
-# 💻 Supported Commands
-
-```text
-PUT key value
-GET key
-REMOVE key
-EXIT
-```
-
----
-
-# 🧠 Design Decisions
-
-## Why Append-Only Logging?
-
-Appending avoids expensive random disk writes and simplifies crash recovery.
-
-## Why Tombstones Instead of Physical Deletes?
-
-Physical deletion inside binary files is unsafe and inefficient.
-Tombstones preserve operation history while enabling deterministic replay.
-
-## Why Replay-Based Recovery?
-
-The WAL acts as the single source of truth.
-State reconstruction guarantees consistency after crashes.
-
-## Why Single Mutex?
-
-The project prioritizes correctness and predictable behavior before introducing fine-grained concurrency.
-
----
-
-# 🧪 Crash Safety
-
-The storage engine is resilient to:
-
-- Forced termination during writes
-- Partial WAL records
-- Unexpected shutdowns
-- Corrupted log tails
-
-Recovery is deterministic because the WAL is replayed sequentially.
-
----
-
-# ⚠️ Limitations
-
-- No log compaction
-- File size grows indefinitely
-- Single global mutex
-- No networking layer
-- No disk-based indexing
-- No unit test suite
-- No replication or snapshots
-
-This project focuses primarily on storage engine fundamentals.
-
----
-
-# 🚀 Future Improvements
-
-- [ ] Log compaction
-- [ ] Offset-based indexing
-- [ ] Read-write locks
-- [ ] Multi-threaded replay
-- [ ] Networking layer
-- [ ] Benchmark suite
-- [ ] Unit & integration tests
-- [ ] Disk-backed SSTables
-- [ ] LSM-tree style compaction
 
 ---
 
 # 📚 Learning Outcomes
 
-This project demonstrates understanding of:
-
-- Binary serialization
-- Write-Ahead Logging (WAL)
-- Log-structured storage engines
-- Crash recovery systems
-- Tombstone-based deletes
-- Concurrency control using mutexes
-- Deterministic replay
-- Persistent storage internals
-- Separation of storage and interface layers
-
----
-
-# 📖 Inspiration
-
-Inspired by concepts used in modern storage engines and databases:
-
-- LevelDB
-- RocksDB
-- Bitcask
-- Redis AOF
-- LSM-tree architectures
+This project demonstrates deep understanding of systems engineering:
+- **LSM-Tree Internals**: Bridging memory and disk for high-throughput writes.
+- **Custom Data Structures**: Probabilistic SkipLists for sorted in-memory bounds.
+- **Disk Layouts**: Chunking files into data blocks and utilizing index blocks.
+- **Serialization**: Raw binary encoding of metadata, sizes, offsets, and strings.
+- **System Testing**: GoogleTest integration for simulated crash recovery and compaction pipelines.
 
 ---
 
 # 📄 License
 
 MIT License
-
-This project was built for educational and learning purposes.
-
----
-
-# ⭐ Support
-
-If you found this project useful, consider giving the repository a star.
