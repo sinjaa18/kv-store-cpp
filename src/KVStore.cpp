@@ -265,7 +265,7 @@ void KVStore::replay() {
             memtable.put(sequence, key, std::nullopt);
     }
 
-    sequenceNumber.store(lastSequence);
+    sequenceNumber.store(std::max(sequenceNumber.load(), lastSequence));
     
     if (memtable.size() >= MEMTABLE_FLUSH_LIMIT) {
         flushMemTable();

@@ -1,10 +1,15 @@
 # ⚡ LogStoreDB — LSM-Style Key-Value Storage Engine
 
 ![C++](https://img.shields.io/badge/C%2B%2B-17-blue)
+
 ![Platform](https://img.shields.io/badge/platform-Windows%2FLinux-lightgrey)
+
 ![Storage Engine](https://img.shields.io/badge/type-storage__engine-orange)
+
 ![LSM Tree](https://img.shields.io/badge/design-LSM--style-green)
-![Tests](https://img.shields.io/badge/tests-24%20passing-success)
+
+![Tests](https://img.shields.io/badge/tests-31%20passing-success)
+
 ![License](https://img.shields.io/badge/license-MIT-yellow)
 
 A lightweight, crash-recoverable **Log-Structured Merge (LSM)-style key-value storage engine** built from scratch in modern C++.
@@ -73,6 +78,7 @@ PUT A = "old"    seq=10
 PUT A = "new"    seq=20
 
 latest version:
+
 A = "new"
 ```
 
@@ -133,39 +139,40 @@ LogStoreDB follows an LSM-style architecture:
                     Client / CLI
                          │
                          ▼
-                 ┌───────────────┐
-                 │    KVStore    │
-                 └───────┬───────┘
+                ┌─────────────────┐
+                │     KVStore     │
+                └────────┬────────┘
                          │
-              ┌──────────┴──────────┐
-              │                     │
-              ▼                     ▼
-       ┌─────────────┐       ┌─────────────┐
-       │     WAL     │       │  MemTable   │
-       │    CRC32    │       │  SkipList   │
-       └─────────────┘       └──────┬──────┘
-                                    │
-                              Flush threshold
-                                    │
-                                    ▼
-                           ┌─────────────────┐
-                           │    SSTable      │
-                           │                 │
-                           │  Data Blocks    │
-                           │  Index Block    │
-                           │  Footer         │
-                           └────────┬────────┘
-                                    │
-                           ┌────────▼────────┐
-                           │  LRU Block      │
-                           │     Cache       │
-                           └────────┬────────┘
-                                    │
-                                    ▼
-                           ┌─────────────────┐
-                           │   Compaction    │
-                           │   K-Way Merge   │
-                           └─────────────────┘
+            ┌────────────┴────────────┐
+            │                         │
+            ▼                         ▼
+     ┌────────────┐            ┌────────────┐
+     │    WAL     │            │  MemTable  │
+     │   CRC32    │            │  SkipList  │
+     └────────────┘            └──────┬─────┘
+                                      │
+                                Flush threshold
+                                      │
+                                      ▼
+                              ┌──────────────┐
+                              │   SSTable    │
+                              │              │
+                              │ Data Blocks  │
+                              │ Index Block  │
+                              │ Footer       │
+                              └──────┬───────┘
+                                     │
+                                     ▼
+                              ┌──────────────┐
+                              │ LRU Block    │
+                              │    Cache     │
+                              └──────┬───────┘
+                                     │
+                                     ▼
+                              ┌──────────────┐
+                              │  Compaction  │
+                              │  K-Way Merge │
+                              └──────────────┘
 ```
 
 The main responsibilities are divided into four layers:
@@ -229,27 +236,25 @@ GET key
             │
             ▼
 4. Check LRU Block Cache
-        ┌───┴───┐
-        │       │
-       HIT     MISS
-        │       │
-        │       ▼
-        │   Read block
-        │       │
-        │       ▼
-        │   Validate + parse
-        │       │
-        │       ▼
-        │   Insert into cache
-        │
-        └───┬───┘
-            ▼
+        ┌───────┴───────┐
+       HIT             MISS
+        │                │
+        │                ▼
+        │           Read block
+        │                │
+        │                ▼
+        │           Validate + parse
+        │                │
+        │                ▼
+        │           Insert into cache
+        └────────┬───────┘
+                 ▼
 5. Resolve matching KVPair by sequence number
-            │
-            ▼
+                 │
+                 ▼
 6. Newest sequence wins
-            │
-            ▼
+                 │
+                 ▼
 7. Tombstone → NOT FOUND
 ```
 
@@ -263,17 +268,17 @@ Deletes are represented using explicit tombstones.
 
 ```text
 REMOVE key
-     │
-     ▼
+    │
+    ▼
 Allocate sequence number
-     │
-     ▼
+    │
+    ▼
 Append DELETE record to WAL
-     │
-     ▼
+    │
+    ▼
 Insert tombstone into MemTable
-     │
-     ▼
+    │
+    ▼
 Flush / Compact
 ```
 
@@ -281,9 +286,12 @@ Example:
 
 ```text
 Older SSTable:
+
 seq=10 → user = Alice
 
+
 Newer record:
+
 seq=20 → user = DELETE
 ```
 
@@ -291,7 +299,7 @@ The delete masks the older version.
 
 ---
 
-# 💿 WAL & Crash Recovery
+# 💾 WAL & Crash Recovery
 
 The WAL is an append-only binary log containing mutation records and checksums.
 
@@ -299,15 +307,15 @@ Conceptually:
 
 ```text
 WAL Record
-┌────────────────────────┐
-│ Sequence Number        │
-│ Operation              │
-│ Key Size               │
-│ Value Size             │
-│ Key                    │
-│ Value                  │
-│ CRC32                  │
-└────────────────────────┘
+┌─────────────────────────┐
+│ Sequence Number         │
+│ Operation               │
+│ Key Size                │
+│ Value Size              │
+│ Key                     │
+│ Value                   │
+│ CRC32                   │
+└─────────────────────────┘
 ```
 
 During recovery:
@@ -316,13 +324,12 @@ During recovery:
 Database Restart
        │
        ├───────────────┐
-       │               │
        ▼               ▼
-Load SSTables       Replay WAL
+ Load SSTables     Replay WAL
        │               │
        └───────┬───────┘
                ▼
-       Reconstruct state
+        Reconstruct state
                │
                ▼
        Restore sequence state
@@ -339,9 +346,9 @@ Calculate CRC32
     ▼
 Compare checksum
     │
-    ├── Valid ───────► Replay
+    ├── Valid ─────────→ Replay
     │
-    └── Invalid ─────► Reject corrupted record
+    └── Invalid ───────→ Reject corrupted record
 ```
 
 This protects recovery from malformed or corrupted WAL records.
@@ -412,9 +419,9 @@ The MemTable stores recent mutations in memory.
 It is backed by a custom SkipList that maintains keys in sorted order.
 
 ```text
-Level 3:        ────────────────►
-Level 2:    ──────────► ────────►
-Level 1:    ───► ───► ───► ────►
+Level 3:        ───────────────────────→
+Level 2:    ─────────────────→ ───────→
+Level 1:    ─────→ ─────→ ─────→ ─────→
 Level 0:    A  →  B  →  C  →  D  →  E
 ```
 
@@ -545,9 +552,12 @@ is used to distinguish between:
 
 ```text
 Actual value:
+
 "A" → "hello"
 
+
 Tombstone:
+
 "A" → nullopt
 ```
 
@@ -588,15 +598,15 @@ As SSTables accumulate, the engine performs compaction.
 ```text
 SSTable 1 ── Iterator ──┐
 SSTable 2 ── Iterator ──┤
-SSTable 3 ── Iterator ──┼──► K-Way Merge
+SSTable 3 ── Iterator ──┼──→ K-Way Merge
 SSTable 4 ── Iterator ──┤
 SSTable N ── Iterator ──┘
-                             │
-                             ▼
-                     Sequence Resolution
-                             │
-                             ▼
-                     New SSTable
+                              │
+                              ▼
+                       Sequence Resolution
+                              │
+                              ▼
+                         New SSTable
 ```
 
 Each input SSTable is traversed incrementally using an iterator rather than being fully loaded into memory.
@@ -605,12 +615,17 @@ For the same key:
 
 ```text
 SSTable A:
+
 seq=10 → A = old
 
+
 SSTable B:
+
 seq=25 → A = new
 
+
 SSTable C:
+
 seq=18 → A = older
 ```
 
@@ -629,16 +644,16 @@ because the highest sequence number represents the newest version.
 The LRU Block Cache stores parsed SSTable blocks in memory.
 
 ```text
-                  ┌──────────────────┐
-                  │   Block Cache    │
-                  │                  │
-                  │ B1  B7  B9  B12  │
-                  └──────────────────┘
-                           ▲
-                           │
-                        GET(key)
-                           │
-                    SSTable Index
+              ┌────────────────────────┐
+              │      Block Cache       │
+              │                        │
+              │ B1  B7  B9  B12        │
+              └────────────────────────┘
+                         ▲
+                         │
+                      GET(key)
+                         │
+                   SSTable Index
 ```
 
 The cache uses:
@@ -757,8 +772,8 @@ Test coverage includes:
 Current test result:
 
 ```text
-24 tests
-24 passed
+31 tests
+31 passed
 0 failed
 ```
 
@@ -997,18 +1012,18 @@ Caching parsed blocks reduces repeated disk reads and parsing work while keeping
 
 Approximate expected complexity:
 
-| Operation          | Complexity          |
-| ------------------ | ------------------- |
-| SkipList lookup    | `O(log N)` expected |
+| Operation | Complexity |
+|---|---|
+| SkipList lookup | `O(log N)` expected |
 | SkipList insertion | `O(log N)` expected |
-| SkipList deletion  | `O(log N)` expected |
-| WAL append         | `O(record size)`    |
-| MemTable flush     | `O(N)` + disk I/O   |
-| LRU lookup         | `O(1)` average      |
-| LRU insertion      | `O(1)`              |
-| LRU eviction       | `O(1)`              |
-| K-way compaction   | `O(N log K)`        |
-| Compaction memory  | `O(K)`              |
+| SkipList deletion | `O(log N)` expected |
+| WAL append | `O(record size)` |
+| MemTable flush | `O(N)` + disk I/O |
+| LRU lookup | `O(1)` average |
+| LRU insertion | `O(1)` |
+| LRU eviction | `O(1)` |
+| K-way compaction | `O(N log K)` |
+| Compaction memory | `O(K)` |
 
 Where:
 
@@ -1113,28 +1128,28 @@ The current core implementation is considered **feature-complete for the project
 # 📌 Project Status
 
 ```text
-┌─────────────────────────────────────────────┐
-│            LogStoreDB STATUS                │
-├─────────────────────────────────────────────┤
-│ WAL                         ✓               │
-│ CRC32                       ✓               │
-│ Crash Recovery              ✓               │
-│ MemTable                    ✓               │
-│ SkipList                    ✓               │
-│ Sequence Numbers            ✓               │
-│ Tombstones                  ✓               │
-│ SSTables                    ✓               │
-│ Block Storage               ✓               │
-│ SSTable Index               ✓               │
-│ SSTable Footer              ✓               │
-│ Streaming Compaction        ✓               │
-│ Corruption Validation       ✓               │
-│ Atomic SSTable Installation ✓               │
-│ LRU Block Cache             ✓               │
-│ Stress Testing              ✓               │
-│ Benchmarks                  ✓               │
-│ Automated Tests             ✓               │
-└─────────────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│            LogStoreDB STATUS             │
+├──────────────────────────────────────────┤
+│ WAL                         ✓            │
+│ CRC32                       ✓            │
+│ Crash Recovery              ✓            │
+│ MemTable                    ✓            │
+│ SkipList                    ✓            │
+│ Sequence Numbers            ✓            │
+│ Tombstones                  ✓            │
+│ SSTables                    ✓            │
+│ Block Storage               ✓            │
+│ SSTable Index               ✓            │
+│ SSTable Footer              ✓            │
+│ Streaming Compaction        ✓            │
+│ Corruption Validation       ✓            │
+│ Atomic SSTable Installation ✓            │
+│ LRU Block Cache             ✓            │
+│ Stress Testing              ✓            │
+│ Benchmarks                  ✓            │
+│ Automated Tests             ✓            │
+└──────────────────────────────────────────┘
 ```
 
 ---
