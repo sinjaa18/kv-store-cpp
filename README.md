@@ -4,7 +4,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2FLinux-lightgrey)
 ![Storage Engine](https://img.shields.io/badge/type-storage__engine-orange)
 ![LSM Tree](https://img.shields.io/badge/design-LSM--style-green)
-![Tests](https://img.shields.io/badge/tests-19%20passing-success)
+![Tests](https://img.shields.io/badge/tests-24%20passing-success)
 ![License](https://img.shields.io/badge/license-MIT-yellow)
 
 A lightweight, crash-recoverable **Log-Structured Merge (LSM)-style key-value storage engine** built from scratch in modern C++.
@@ -703,19 +703,19 @@ A cache benchmark was run using **10,000 generated records across multiple SSTab
 ### Random GET
 
 ```text
-Without Cache : 2861 ms
-With Cache    : 1221 ms
+Without Cache : 1028 ms
+With Cache    : 479 ms
 
-Improvement   : ~2.3× faster
+Improvement   : ~2.15× faster
 ```
 
 ### Hot / Repeated GET
 
 ```text
-Without Cache : 2760 ms
-With Cache    :  785 ms
+Without Cache : 991 ms
+With Cache    : 326 ms
 
-Improvement   : ~3.5× faster
+Improvement   : ~3.04× faster
 ```
 
 ### Cache Statistics
@@ -723,7 +723,8 @@ Improvement   : ~3.5× faster
 ```text
 Hits          : 18,569
 Misses        : 2,792
-Hit Rate      : ~87%
+Hit Rate      : ~86.9%
+Evictions     : 2,728
 ```
 
 These results demonstrate the benefit of caching repeatedly accessed SSTable blocks for the tested workload.
@@ -756,8 +757,8 @@ Test coverage includes:
 Current test result:
 
 ```text
-19 tests
-19 passed
+24 tests
+24 passed
 0 failed
 ```
 
@@ -799,39 +800,51 @@ State validation
 LogStoreDB/
 │
 ├── include/
-│   ├── KVStore.h
-│   ├── WAL.h
-│   ├── WALRecord.h
+│   ├── Block.h
+│   ├── BlockCache.h
 │   ├── KVPair.h
+│   ├── KVStore.h
 │   ├── MemTable.h
-│   └── SkipList.h
+│   ├── SSTableReader.h
+│   ├── SSTableWriter.h
+│   ├── SkipList.h
+│   ├── WAL.h
+│   └── WALRecord.h
 │
 ├── src/
+│   ├── Block.cpp
+│   ├── BlockCache.cpp
 │   ├── KVStore.cpp
-│   ├── WAL.cpp
 │   ├── MemTable.cpp
-│   └── SkipList.cpp
+│   ├── SSTableReader.cpp
+│   ├── SSTableWriter.cpp
+│   ├── SkipList.cpp
+│   └── WAL.cpp
 │
 ├── cli/
 │   └── main.cpp
 │
 ├── tests/
-│   ├── test_wal.cpp
-│   ├── test_skiplist.cpp
-│   ├── test_memtable.cpp
-│   ├── test_sstable.cpp
+│   ├── test_benchmark.cpp
+│   ├── test_cache.cpp
 │   ├── test_corruption.cpp
+│   ├── test_kvstore.cpp
+│   ├── test_memtable.cpp
 │   ├── test_sequence.cpp
-│   └── test_stress.cpp
+│   ├── test_skiplist.cpp
+│   ├── test_sstable.cpp
+│   ├── test_stress.cpp
+│   └── test_wal.cpp
 │
-├── data/
-│   └── runtime database files
+├── screenshots/
+│   ├── WAL-binDump.png
+│   ├── cli-demo.png
+│   └── crash-recovery.png
 │
 ├── CMakeLists.txt
-└── README.md
+├── README.md
+└── .gitignore
 ```
-
-Additional SSTable, block-storage, iterator, and cache implementation files may be organized according to the repository's current source layout.
 
 ---
 
