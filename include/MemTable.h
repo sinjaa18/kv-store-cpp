@@ -4,14 +4,15 @@
 #include<string>
 #include "SkipList.h"
 #include<optional>
+#include "KVPair.h"
 
 class MemTable {
     SkipList data;
 public:
-    bool put(const std::string& key, const std::string& value);
-    std::optional<std::string> get(const std::string& key) const;
-    bool remove(const std::string& key);
-    std::vector<std::pair<std::string, std::string>> entries() const;
+    bool put(uint64_t seq, const std::string& key,const std::optional<std::string>& value);
+    std::optional<KVPair> get(const std::string& key)const;
+    bool remove(uint64_t seq, const std::string& key);
+    std::vector<KVPair> entries() const;
     size_t size() const;
     void clear();
 };

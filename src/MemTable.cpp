@@ -1,12 +1,13 @@
 #include "MemTable.h"
 
 bool MemTable::put(
+    uint64_t seq,
     const std::string& key,
-    const std::string& value) {
-    return data.put(key,value);
+    const std::optional<std::string>& value) {
+    return data.put(seq, key,value);
 }
 
-std::optional<std::string>
+std::optional<KVPair>
 MemTable::get(
     const std::string& key)const {
     return data.get(key);
@@ -14,11 +15,12 @@ MemTable::get(
 
 
 bool MemTable::remove(
+    uint64_t seq,
     const std::string& key) {
-    return data.remove(key) ;
+    return data.remove(seq, key) ;
 }
 
-std::vector<std::pair<std::string, std::string>> MemTable::entries() const {
+std::vector<KVPair> MemTable::entries() const {
     return data.entries();
 }
 

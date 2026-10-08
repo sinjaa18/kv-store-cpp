@@ -18,8 +18,8 @@ protected:
 
 TEST_F(WALTest, AppendPutAndDelete) {
     WAL wal(testFile);
-    EXPECT_TRUE(wal.appendPut("key1", "val1"));
-    EXPECT_TRUE(wal.appendDelete("key1"));
+    EXPECT_TRUE(wal.appendPut(1, "key1", "val1"));
+    EXPECT_TRUE(wal.appendDelete(2, "key1"));
     EXPECT_TRUE(std::filesystem::exists(testFile));
     EXPECT_GT(std::filesystem::file_size(testFile), 0);
 }

@@ -1,124 +1,79 @@
 #include "WAL.h"
-#include<fstream>
+#include <iostream>
+#include <vector>
 
-constexpr uint32_t MAX_KEY_SIZE = 1 << 20;
-constexpr uint32_t MAX_VALUE_SIZE = 16 << 20;
+enum Operation : uint8_t {
+    PUT = 0,
+    DELETE = 1
+};
 
-WAL::WAL(std::string file)
-:filename(file){}
-
-void WAL::writeUint64(std::ofstream& out, uint64_t value) {
-    out.write(reinterpret_cast<const char*>(&value), sizeof(value));
+WAL::WAL(const std::string& path) : filename(path) {
+    out.open(filename, std::ios::app | std::ios::binary);
 }
 
-void WAL::writeUint32(std::ofstream& out, uint32_t value) {
-    out.write(reinterpret_cast<const char*>(&value), sizeof(value));
+WAL::~WAL() {
+    if (out.is_open()) out.close();
 }
 
-void WAL::writeUint8(std::ofstream& out, uint8_t value) {
-    out.write(reinterpret_cast<const char*>(&value), sizeof(value));
-}
-
-uint32_t WAL::checksum(
-const std::string& key,
-const std::string& value)const{
-    uint32_t hash=0;
-    for(char c:key)
-        hash=hash*31+c;
-    for(char c:value)
-        hash=hash*31+c;
-    return hash;
-}
-
-bool WAL::verifyChecksum(
-    uint32_t expected,
-    const std::string& key,
-    const std::string& value
-)const {
-
-    return checksum(key, value) == expected;
-}
-
-bool WAL::appendPut(
-    const std::string& key,
-    const std::string& value) {
-
-    std::ofstream out(
-        filename,
-        std::ios::binary | std::ios::app
-    );
-
-    if (!out.is_open())
-        return false;
-    if (key.empty() || key.size() > MAX_KEY_SIZE)
-        return false;
-
-    if (value.size() > MAX_VALUE_SIZE)
-        return false;
-    uint64_t nextSequence = currentSequence + 1;
-    uint32_t keySize = key.size();
-    uint32_t valueSize = value.size();
-    uint32_t sum = checksum(key, value);
-
-    writeUint64(out, nextSequence);
-    writeUint8(out, static_cast<uint8_t>(PUT));
-    writeUint32(out, keySize);
-    writeUint32(out, valueSize);
-    writeUint32(out, sum);
-
-    out.write(key.data(), keySize);
-    out.write(value.data(), valueSize);
-
+bool WAL::appendPut(uint64_t seq, const std::string& key, const std::string& value) {
+    if (!out.is_open()) return false;
+    
+    uint8_t op = PUT;
+    uint32_t kSize = key.size();
+    uint32_t vSize = value.size();
+    uint32_t checksum = calculateChecksum(key, value);
+    
+    out.write(reinterpret_cast<const char*>(&seq), sizeof(seq));
+    out.write(reinterpret_cast<const char*>(&op), sizeof(op));
+    out.write(reinterpret_cast<const char*>(&kSize), sizeof(kSize));
+    out.write(reinterpret_cast<const char*>(&vSize), sizeof(vSize));
+    out.write(reinterpret_cast<const char*>(&checksum), sizeof(checksum));
+    out.write(key.data(), kSize);
+    out.write(value.data(), vSize);
+    
     out.flush();
-    if (!out)
-        return false;
-    currentSequence = nextSequence;
-
     return true;
 }
 
-bool WAL::appendDelete(
-    const std::string& key) {
+bool WAL::appendDelete(uint64_t seq, const std::string& key) {
+    if (!out.is_open()) return false;
 
-    std::ofstream out(
-        filename,
-        std::ios::binary | std::ios::app
-    );
+    uint8_t op = DELETE;
+    uint32_t kSize = key.size();
+    uint32_t vSize = 0;
+    uint32_t checksum = calculateChecksum(key, "");
 
-    if (!out.is_open())
-        return false;
-    if (key.empty() || key.size() > MAX_KEY_SIZE)
-        return false;
-
-    uint64_t nextSequence = currentSequence + 1;
-    uint32_t keySize = key.size();
-    uint32_t valueSize = 0;
-    uint32_t sum = checksum(key, "");
-
-    writeUint64(out, nextSequence);
-    writeUint8(out, static_cast<uint8_t>(DELETE));
-    writeUint32(out, keySize);
-    writeUint32(out, valueSize);
-    writeUint32(out, sum);
-
-    out.write(key.data(), keySize);
+    out.write(reinterpret_cast<const char*>(&seq), sizeof(seq));
+    out.write(reinterpret_cast<const char*>(&op), sizeof(op));
+    out.write(reinterpret_cast<const char*>(&kSize), sizeof(kSize));
+    out.write(reinterpret_cast<const char*>(&vSize), sizeof(vSize));
+    out.write(reinterpret_cast<const char*>(&checksum), sizeof(checksum));
+    out.write(key.data(), kSize);
 
     out.flush();
-
-    if (!out)
-        return false;
-
-    currentSequence = nextSequence;
-
     return true;
-}
-
-void WAL::setCurrentSequence(uint64_t sequence) {
-    currentSequence = sequence;
 }
 
 void WAL::clear() {
-    std::ofstream out(filename, std::ios::trunc | std::ios::binary);
-    out.close();
-    currentSequence = 0;
+    if (out.is_open()) out.close();
+    out.open(filename, std::ios::trunc | std::ios::binary);
+}
+
+uint32_t WAL::calculateChecksum(const std::string& key, const std::string& value) const {
+    uint32_t crc = 0xFFFFFFFF;
+    auto update = [&crc](const std::string& str) {
+        for (char c : str) {
+            crc ^= static_cast<uint8_t>(c);
+            for (int i = 0; i < 8; i++) {
+                crc = (crc >> 1) ^ (0xEDB88320 & (-(crc & 1)));
+            }
+        }
+    };
+    update(key);
+    update(value);
+    return ~crc;
+}
+
+bool WAL::verifyChecksum(uint32_t checksum, const std::string& key, const std::string& value) const {
+    return calculateChecksum(key, value) == checksum;
 }

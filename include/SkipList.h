@@ -5,14 +5,16 @@
 #include<utility>
 #include<string>
 #include<optional>
+#include "KVPair.h"
 
 class SkipList {
     struct Node {
         std::string key;
-        std::string value;
+        std::optional<std::string> value;
+        uint64_t seq;
         std::vector<Node*> next;
-        Node(const std::string& k,const std::string& v,int level
-            ):key(k), value(v), next(level, nullptr) {
+        Node(const std::string& k,const std::optional<std::string>& v, uint64_t s, int level
+            ):key(k), value(v), seq(s), next(level, nullptr) {
         }
     };
     static constexpr int MAX_LEVEL = 16;
@@ -22,10 +24,10 @@ class SkipList {
 public:
     SkipList();
     ~SkipList();
-    bool put(const std::string& key,const std::string& value);
-    std::optional<std::string> get(const std::string& key)const;
-    bool remove(const std::string& key);
-    std::vector<std::pair<std::string,std::string>> entries()const;
+    bool put(uint64_t seq, const std::string& key,const std::optional<std::string>& value);
+    std::optional<KVPair> get(const std::string& key)const;
+    bool remove(uint64_t seq, const std::string& key);
+    std::vector<KVPair> entries()const;
     size_t size() const;
     void clear();
 private:

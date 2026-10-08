@@ -12,6 +12,7 @@ add_library(KVS_core
     src/SSTableWriter.cpp
     src/SSTableReader.cpp
     src/Block.cpp
+    src/BlockCache.cpp
 )
 target_include_directories(KVS_core PUBLIC include)
 
@@ -44,9 +45,27 @@ target_link_libraries(test_kvstore PRIVATE KVS_core gtest_main)
 add_executable(test_sstable tests/test_sstable.cpp)
 target_link_libraries(test_sstable PRIVATE KVS_core gtest_main)
 
+add_executable(test_corruption tests/test_corruption.cpp)
+target_link_libraries(test_corruption PRIVATE KVS_core gtest_main)
+
 include(GoogleTest)
 gtest_discover_tests(test_skiplist)
 gtest_discover_tests(test_memtable)
 gtest_discover_tests(test_wal)
 gtest_discover_tests(test_kvstore)
 gtest_discover_tests(test_sstable)
+gtest_discover_tests(test_corruption)
+
+add_executable(test_sequence tests/test_sequence.cpp)
+target_link_libraries(test_sequence PRIVATE KVS_core gtest_main)
+gtest_discover_tests(test_sequence)
+
+add_executable(test_cache tests/test_cache.cpp)
+target_link_libraries(test_cache PRIVATE KVS_core gtest_main)
+gtest_discover_tests(test_cache)
+
+add_executable(test_benchmark tests/test_benchmark.cpp)
+target_link_libraries(test_benchmark PRIVATE KVS_core)
+
+add_executable(test_stress tests/test_stress.cpp)
+target_link_libraries(test_stress PRIVATE KVS_core)

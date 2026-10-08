@@ -5,10 +5,10 @@
 
 SkipList::SkipList() :currentLevel(1) {
     srand(static_cast<unsigned int>(time(0)));
-    head = new Node("", "", MAX_LEVEL);
+    head = new Node("", std::nullopt, 0, MAX_LEVEL);
 }
 
-bool SkipList::put(const std::string& key, const std::string& value) {
+bool SkipList::put(uint64_t seq, const std::string& key, const std::optional<std::string>& value) {
     std::vector<Node*> update(MAX_LEVEL, nullptr);
     Node* cur = head;
 
@@ -22,6 +22,7 @@ bool SkipList::put(const std::string& key, const std::string& value) {
 
     if (cur && cur->key == key) {
         cur->value = value;
+        cur->seq = seq;
         return true;
     }
 
@@ -33,7 +34,7 @@ bool SkipList::put(const std::string& key, const std::string& value) {
         currentLevel = level;
     }
 
-    Node* node = new Node(key, value, level);
+    Node* node = new Node(key, value, seq, level);
 
     for (int i = 0;i < level;i++) {
         node->next[i] = update[i]->next[i];
@@ -45,7 +46,7 @@ bool SkipList::put(const std::string& key, const std::string& value) {
 }
 
 
-std::optional<std::string> SkipList::get(const std::string& key)const {
+std::optional<KVPair> SkipList::get(const std::string& key)const {
     Node* cur = head;
     for (int lvl = currentLevel - 1;lvl >= 0;lvl--) {
         while (cur->next[lvl] && cur->next[lvl]->key < key)
@@ -54,12 +55,12 @@ std::optional<std::string> SkipList::get(const std::string& key)const {
 
     cur=cur->next[0];
     if (cur && cur->key == key) 
-        return cur->value;
+        return KVPair{cur->seq, cur->key, cur->value};
     return std::nullopt;
 }
 
 
-bool SkipList::remove(const std::string& key) {
+bool SkipList::remove(uint64_t seq, const std::string& key) {
     std::vector<Node*> update(MAX_LEVEL, nullptr);
     Node* cur = head;
     for (int lvl = currentLevel - 1;lvl >= 0;lvl--) {
@@ -93,12 +94,12 @@ int SkipList::randomLevel() {
     return level;
 }
 
-std::vector<std::pair<std::string,std:: string>> SkipList::entries()const{
-    std::vector < std::pair < std::string, std::string>>result;
+std::vector<KVPair> SkipList::entries()const{
+    std::vector < KVPair >result;
     Node* cur=head->next[0];
 
     while(cur){
-        result.push_back({cur->key,cur->value});
+        result.push_back({cur->seq, cur->key,cur->value});
         cur=cur->next[0];
     }
     return result;

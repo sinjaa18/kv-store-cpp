@@ -5,10 +5,13 @@ BlockBuilder::BlockBuilder() {
     reset();
 }
 
-void BlockBuilder::add(const std::string& key, const std::string& value) {
+void BlockBuilder::add(uint64_t seq, const std::string& key, const std::optional<std::string>& value) {
     uint32_t kSize = key.size();
-    uint32_t vSize = value.size();
+    uint32_t vSize = value.has_value() ? value->size() : 0xFFFFFFFF;
     
+    uint8_t* sPtr = (uint8_t*)&seq;
+    buffer.insert(buffer.end(), sPtr, sPtr + sizeof(uint64_t));
+
     uint8_t* kPtr = (uint8_t*)&kSize;
     buffer.insert(buffer.end(), kPtr, kPtr + sizeof(uint32_t));
     
@@ -16,7 +19,9 @@ void BlockBuilder::add(const std::string& key, const std::string& value) {
     buffer.insert(buffer.end(), vPtr, vPtr + sizeof(uint32_t));
     
     buffer.insert(buffer.end(), key.begin(), key.end());
-    buffer.insert(buffer.end(), value.begin(), value.end());
+    if (value.has_value()) {
+        buffer.insert(buffer.end(), value->begin(), value->end());
+    }
     
     entryCount++;
 }
@@ -42,8 +47,8 @@ bool BlockBuilder::isEmpty() const {
 
 BlockReader::BlockReader(std::vector<uint8_t> blockData) : data(std::move(blockData)) {}
 
-std::vector<std::pair<std::string, std::string>> BlockReader::readAll() const {
-    std::vector<std::pair<std::string, std::string>> entries;
+std::vector<KVPair> BlockReader::readAll() const {
+    std::vector<KVPair> entries;
     if (data.size() < sizeof(uint32_t)) return entries;
     
     uint32_t count = 0;
@@ -51,22 +56,31 @@ std::vector<std::pair<std::string, std::string>> BlockReader::readAll() const {
     
     size_t offset = sizeof(uint32_t);
     for (uint32_t i = 0; i < count; ++i) {
-        if (offset + 2 * sizeof(uint32_t) > data.size()) break;
+        if (offset + sizeof(uint64_t) + 2 * sizeof(uint32_t) > data.size()) break;
         
+        uint64_t seq = 0;
+        std::memcpy(&seq, data.data() + offset, sizeof(uint64_t));
+        offset += sizeof(uint64_t);
+
         uint32_t kSize = 0, vSize = 0;
         std::memcpy(&kSize, data.data() + offset, sizeof(uint32_t));
         offset += sizeof(uint32_t);
         std::memcpy(&vSize, data.data() + offset, sizeof(uint32_t));
         offset += sizeof(uint32_t);
         
-        if (offset + kSize + vSize > data.size()) break;
+        if (vSize != 0xFFFFFFFF && offset + kSize + vSize > data.size()) break;
+        if (vSize == 0xFFFFFFFF && offset + kSize > data.size()) break;
         
         std::string key((char*)data.data() + offset, kSize);
         offset += kSize;
-        std::string value((char*)data.data() + offset, vSize);
-        offset += vSize;
         
-        entries.push_back({key, value});
+        if (vSize == 0xFFFFFFFF) {
+            entries.push_back({seq, key, std::nullopt});
+        } else {
+            std::string value((char*)data.data() + offset, vSize);
+            offset += vSize;
+            entries.push_back({seq, key, value});
+        }
     }
     
     return entries;

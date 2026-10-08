@@ -26,14 +26,17 @@ void SSTableWriter::flushBlock() {
     currentBlock.reset();
 }
 
-bool SSTableWriter::append(const std::string& key, const std::string& value) {
+bool SSTableWriter::append(uint64_t seq, const std::string& key, const std::optional<std::string>& value) {
     if (!out.is_open()) return false;
     
     if (currentBlock.isEmpty()) {
         currentFirstKey = key;
     }
     
-    currentBlock.add(key, value);
+    currentBlock.add(seq, key, value);
+    if (seq > maxSeq) {
+        maxSeq = seq;
+    }
     if (currentBlock.size() >= BLOCK_SIZE_LIMIT) {
         flushBlock();
     }
@@ -52,7 +55,7 @@ void SSTableWriter::close() {
         std::string value(sizeof(uint64_t) * 2, '\0');
         std::memcpy(&value[0], &bh.offset, sizeof(uint64_t));
         std::memcpy(&value[sizeof(uint64_t)], &bh.size, sizeof(uint64_t));
-        indexBuilder.add(bh.firstKey, value);
+        indexBuilder.add(0, bh.firstKey, value);
     }
     
     auto& indexData = indexBuilder.finish();
@@ -63,6 +66,7 @@ void SSTableWriter::close() {
         currentOffset += indexSize;
     }
     
+    out.write(reinterpret_cast<const char*>(&maxSeq), sizeof(uint64_t));
     out.write(reinterpret_cast<const char*>(&indexOffset), sizeof(uint64_t));
     out.write(MAGIC, 8);
     
